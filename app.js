@@ -701,7 +701,7 @@ const MINI_SIZE = { seat: [265, 168], dash: [125, 78] };
 /* 실제 차 화면 크기(mm)를 같은 밀도(1920 px / 312.78 mm ≈ 6.14 px/mm)로 옮긴 해상도 */
 const REAL_SIZE = { front2: [1830, 493], rear2: [1920, 1082], ipad: [1475, 1025] };   /* ipad = 2360×1640 화면 비율 (화면 픽셀의 1/1.6 크기로 그려서 글자·버튼이 아이패드에서 알맞은 크기) */
 /* 앱으로 열면(홈 화면에 추가·?app=1) 바깥 미리보기 틀 없이 아이패드 화면을 꽉 채움 */
-const APP_MODE = true || (() => { try { return matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true || /[?&]app=1/.test(location.search); } catch (e) { return false; } })();
+const APP_MODE = true; // Open directly as a frameless iPad app.
 if (APP_MODE) { document.documentElement.classList.add('appmode'); S.display = 'ipad'; }
 /* 섹션 머리: Spotify 웹처럼 작은 윗말 + 굵은 제목 */
 const shx = (eyebrow, title, art = '') => `<div class="shx">${art}<div>${eyebrow ? `<div class="shx-ey">${esc(eyebrow)}</div>` : ''}<h2 class="shx-t">${esc(tEN(title))}</h2></div></div>`;
@@ -1821,11 +1821,21 @@ function miniTick() { const s = curSong(), d = s.el ? (s.el.duration || 1) : (s.
   const bg = $('#mvLsBg'); if (bg) { const h = Math.round(LS.hue * 360 + (LSM.beat % 8) * 24); bg.style.background = `radial-gradient(70% 90% at ${25 + (LSM.beat * 29) % 50}% 30%, hsl(${h} 88% 70% / .55), transparent 70%), radial-gradient(60% 80% at 80% 90%, hsl(${h + 70} 85% 68% / .45), transparent 70%)`; } }
 /* ---------------- scaling ---------------- */
 function layoutScale() {
-  const ms = MINI_SIZE[S.display], rs = REAL_SIZE[S.display], W = ms ? ms[0] : rs ? rs[0] : isRear() ? 1280 : 1920, H = ms ? ms[1] : rs ? rs[1] : isRear() ? 800 : 1200; const dev = $('#device'); dev.style.width = W + 'px'; dev.style.height = H + 'px';
-  const wrap = $('#stageWrap'); const avail = APP_MODE ? window.innerWidth : (wrap.clientWidth || document.documentElement.clientWidth || window.innerWidth);
-  if (!wrap.clientWidth) requestAnimationFrame(() => { if ($('#stageWrap').clientWidth) layoutScale(); }); /* frame laid out late (e.g. panel opened hidden) → measure again */
-  const maxH = APP_MODE ? window.innerHeight : Math.max(320, window.innerHeight - 120); const sc = APP_MODE ? Math.min(avail / W, maxH / H) : Math.min(avail / W, maxH / H, ms ? 5 : 1);   // 작은 화면(뒷좌석·대시보드)은 크게 키워서 보여 줌
-  $('#scaler').style.width = W * sc + 'px'; $('#scaler').style.height = H * sc + 'px'; $('#scaler').style.margin = '0 auto'; dev.style.transform = `scale(${sc})`;
+  const ms = MINI_SIZE[S.display], rs = REAL_SIZE[S.display];
+  const baseW = ms ? ms[0] : rs ? rs[0] : isRear() ? 1280 : 1920;
+  const baseH = ms ? ms[1] : rs ? rs[1] : isRear() ? 800 : 1200;
+  const dev = $('#device'), wrap = $('#stageWrap'), scaler = $('#scaler');
+  const avail = wrap.clientWidth || document.documentElement.clientWidth || window.innerWidth;
+  const maxH = APP_MODE ? (wrap.clientHeight || window.innerHeight) : Math.max(320, window.innerHeight - 120);
+  const sc = Math.min(avail / baseW, maxH / baseH, APP_MODE ? Infinity : ms ? 5 : 1);
+  if (!(sc > 0)) return;
+  // Keep controls proportional, then expand the canvas to fill the visible screen.
+  // This avoids letterboxing on other iPad sizes, rotation and Safari's toolbar.
+  const W = APP_MODE ? avail / sc : baseW, H = APP_MODE ? maxH / sc : baseH;
+  dev.style.width = W + 'px'; dev.style.height = H + 'px';
+  scaler.style.width = (APP_MODE ? avail : W * sc) + 'px';
+  scaler.style.height = (APP_MODE ? maxH : H * sc) + 'px';
+  scaler.style.margin = '0 auto'; dev.style.transform = `scale(${sc})`;
 }
 addEventListener('resize', layoutScale);
 try { new ResizeObserver(() => layoutScale()).observe($('#stageWrap')); } catch (e) { }
