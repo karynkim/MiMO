@@ -231,6 +231,8 @@ const curSong = () => songById(S.songId) || SONGS[0];
 const AE = { ctx: null, master: null, media: null, loopBus: null, chordBus: null, fxBus: null, noise: null, next: 0, step: 0, timer: null, stepTimes: [], el: null, elSrc: null, meyda: null };
 function ensureAudio() {
   if (AE.ctx) return AE.ctx;
+  // Use the media playback session on iPad, including synthesized instruments.
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (_) { }
   const ctx = new (window.AudioContext || window.webkitAudioContext)(); AE.ctx = ctx;
   AE.master = ctx.createGain(); AE.master.gain.value = 0.8;
   // safety limiter: stacked chords + demo bass used to sum past 0 dBFS and crackle on car speakers
@@ -242,6 +244,17 @@ function ensureAudio() {
   startAnalysis();
   return ctx;
 }
+// Resume in the touch/key gesture itself, before any asynchronous UI work.
+function unlockAudio() {
+  const ctx = ensureAudio();
+  if (ctx.state !== 'running') ctx.resume().catch(() => {});
+}
+document.addEventListener('pointerdown', e => {
+  if (e.target.closest?.('#device')) unlockAudio();
+}, { capture: true, passive: true });
+document.addEventListener('keydown', e => {
+  if (!e.repeat && ['Enter', ' ', 'a', 's', 'd'].includes(e.key)) unlockAudio();
+}, true);
 function applyVolumes() { if (!AE.ctx) return; const v = DB.settings.vol; AE.media.gain.cancelScheduledValues(AE.ctx.currentTime); AE.media.gain.value = S.playing ? v.media / 100 : 0; AE.loopBus.gain.value = v.loop / 100 * 0.9; AE.chordBus.gain.value = v.chord / 100 * 0.8; AE.fxBus.gain.value = DB.settings.fxOn === false ? 0 : Math.max(v.fx, 40) / 100;   /* 효과음은 켜기/끄기만 */ AE.voiceBus.gain.value = v.voice / 100 * 1.4; }
 function env(g, t, a, peak, d) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
 function noiseHit(dest, t, type, freq, peak, dec, q = 0.8) { const c = AE.ctx; const s = c.createBufferSource(); s.buffer = AE.noise; const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q; const g = c.createGain(); env(g, t, 0.002, peak, dec); s.connect(f); f.connect(g); g.connect(dest); s.start(t, Math.random() * 0.5); s.stop(t + dec + 0.05); }
@@ -288,6 +301,9 @@ function cellsPerBar() { return meter() * (isHalf() ? 2 : 1); }
 function loopPos(st) { const p = pattern(); const total = cellsPerBar() * p.bars; if (st < 0) return -1; if (isHalf()) return st % total; return st % 2 ? -2 : (st / 2) % total; }
 function schedule() {
   const ctx = AE.ctx; if (!ctx) return;
+  if (ctx.state !== 'running') return;
+  // Returning from the background must not replay a backlog of old beats.
+  if (AE.next < ctx.currentTime - 0.12) AE.next = ctx.currentTime + 0.01;
   const stepDur = 60 / tempo() / 2;
   while (AE.next < ctx.currentTime + 0.12) {
     const t = AE.next, st = AE.step, s = curSong(); const cpb = meter() * 2; const inBar = st % cpb; const bar = Math.floor(st / cpb);
