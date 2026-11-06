@@ -1421,6 +1421,12 @@ button:focus:not(:focus-visible),[role="button"]:focus:not(:focus-visible){outli
 .mini-dash .mvb.mvplay{width:20px;height:20px;padding:5px !important}
 .mini-dash .mvcall{position:static;width:18px;height:18px}
 .mv-clock{font-size:10px;font-weight:500;font-variant-numeric:tabular-nums}
+/* Fit animation choices to the available iPad panel width. */
+.decotiles{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px}
+.decotile{min-width:0}
+.decotile .hw{max-width:100%}
+.decotile .t-label{max-width:100%;text-align:center;overflow-wrap:anywhere}
+#device .sktool{font-size:15px;font-weight:400}
 /* 앱 모드 (아이패드 홈 화면에서 열었을 때): 미리보기 도구·틀 없이 화면 꽉 채움 */
 html.appmode,html.appmode body{height:100%;overflow:hidden;overscroll-behavior:none}
 html.appmode body{padding:0 !important;margin:0;background:var(--bg-canvas,#fff)}
@@ -1447,8 +1453,8 @@ html.appmode #device{border-radius:0 !important}
 <script src="app.js"></script>
 
 
-<script>/* 앱 버전 20261106-dots-03 — 새 버전이 올라오면 자동으로 받아서 다시 열림 */
-window.MIMO_VERSION='20261106-dots-03';
+<script>/* 앱 버전 20261106-layout-04 — 새 버전이 올라오면 자동으로 받아서 다시 열림 */
+window.MIMO_VERSION='20261106-layout-04';
 if ('serviceWorker' in navigator) {
   let reloaded = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloaded) return; reloaded = true; location.reload(); });
