@@ -534,12 +534,20 @@ function alDraw(D) {
   if (D !== 'minimal') alDot(C, C, (4.5 + 2 * L.voice) * ds, cA * B);
   if (L.bloom > 0) alSpot(C, C, L.bloom * MAXR * 1.25, L.bloom * 0.8);
   if (D === 'ring') radii.forEach((Ri, i) => { for (let k = 0; k < LP.count; k++) { const th = L.aFront + k / LP.count * TAU, w = alAngW(th); alDot(C + Ri * Math.cos(th), C + Ri * Math.sin(th), (2.6 + 1.8 * w) * ds * (1 - i * 0.08), rA * B * w * (1 - i * 0.12)); } });
-  if (D === 'minimal') { const px = Math.cos(L.aFront + Math.PI / 2), py = Math.sin(L.aFront + Math.PI / 2), n = LP.count, spr = L.spread, Sx = L.r * LP.gap * MAXR * 2.6 * spr;
-    if (L.pair > 0.5) { const off = (L.pairPhi / Math.PI) * Sx * Math.max(1, (n - 1) / 2); [-1, 1].forEach(s => alDot(C + px * off * s, C + py * off * s, (5 + 3 * L.pairFlash) * ds, B * (0.7 + 0.3 * L.pairFlash))); }
-    else for (let k = 0; k < n; k++) { const o = (k - (n - 1) / 2) * Sx; let a = 1; const r = 5, mid = Math.abs(k - (n - 1) / 2) < 0.6;
+  if (D === 'minimal') {
+    // All views share the configured dot count, including idle and sync reactions.
+    const px = Math.cos(L.aFront + Math.PI / 2), py = Math.sin(L.aFront + Math.PI / 2), n = LP.count;
+    const radius = 5 * ds;
+    const desiredGap = Math.max(0.55, L.r) * LP.gap * MAXR * 2.6 * Math.max(0.75, L.spread);
+    const gap = Math.min(desiredGap, (MAXR - radius * 2) * 2 / (n - 1));
+    for (let k = 0; k < n; k++) {
+      const o = (k - (n - 1) / 2) * gap;
+      let a = 1;
       if (L.trail > 0.2) a = 0.3 + 0.7 * Math.max(0, Math.sin(T * 6 * sp - k * 1.1));
-      if (L.front > 0.3 && mid) { const Lv = L.voice * 9 * ds; alx.lineWidth = r * 2 * ds; alSeg(C + px * o - py * Lv, C + py * o + px * Lv, C + px * o + py * Lv, C + py * o - px * Lv, B * a); continue; }
-      const wk = k === 0 ? 1 : Math.min(1, spr * 1.5); if (wk > 0.01) alDot(C + px * o, C + py * o, r * ds, B * a * (mid ? 1 : 0.85) * wk); } }
+      if (L.pair > 0.5) a *= 0.7 + 0.3 * L.pairFlash;
+      alDot(C + px * o, C + py * o, radius * (1 + 0.15 * L.voice), B * a);
+    }
+  }
   alx.lineWidth = 3; for (const rp of alRip) { const age = (T - rp.t0) / 0.7; if (age >= 1) continue; alx.globalAlpha = Math.pow(1 - age, 1.5) * 0.9; alx.beginPath(); alx.arc(C, C, Math.max(1, age * MAXR * 1.15), 0, TAU); alx.stroke(); }
 }
 /* 디스플레이(천 아래 LED)에 색을 입혀 합성: 번진 색 빛 + 가운데 밝은 심 */
