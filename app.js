@@ -2438,3 +2438,36 @@ function tkLocal(t, actsOnly) {
 accInit(); initBG(); setAlbum(); spInit(); i18nInit(); render(); applyBright(); npqWake(); tgInit();
 try { document.fonts.load('40px "ABC Connect Nail"').then(() => render()); } catch (e) { } requestAnimationFrame(frame);
 setInterval(() => { const st = $('.status .t-numeric'); if (st) { const d = new Date(); st.textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); } }, 15000);
+
+/* ---------------- mimo 시뮬레이터 연결 ----------------
+   시뮬레이터(click-admin) 안에 이 앱이 떠 있을 때: 앱 상태를 시뮬레이터로 보내고,
+   시뮬레이터에서 mimo를 만지면 지금 화면·상황에 맞게 앱이 반응함
+   · 노래 재생 중 / 화음 화면 → 누른 방향의 화음 (I · IV · V · vi, 지금 곡의 조)
+   · 루프 화면 → 누른 방향의 드럼 (앞 킥 · 옆 스네어 · 뒤 하이햇, 녹음 중이면 루프에 기록)
+   · 두 번 톡톡 → AI 호출 · 그 밖 → mimo 빛만 반응 */
+(() => {
+  if (window.parent === window) return;
+  const post = m => { try { window.parent.postMessage(m, '*'); } catch (e) { } };
+  const state = () => { try { const s = curSong(), k = detectedKey();
+    post({ type: 'mimo-app', v: 1, screen: S.screen, playing: !!S.playing, title: s.t, artist: s.a, bpm: Math.round(tempo()), key: k, keyName: keyName(k), energy: +(AN.energy || 0).toFixed(3) }); } catch (e) { } };
+  setInterval(state, 300); state();
+  const DEG = [0, 3, 4, 5];   // 앞 I · 오른쪽 IV · 뒤 V · 왼쪽 vi
+  window.addEventListener('message', async e => {
+    const m = e.data; if (!m || m.type !== 'mimo-touch') return;
+    const ctx = ensureAudio(); try { await ctx.resume(); } catch (_) { }
+    const ang = ((+m.ang || 0) % 360 + 360) % 360, v = Math.max(0.4, Math.min(1.4, +m.str || 1));
+    let res = { did: 'glow', label: '' };
+    if (m.kind === 'double') { tapMimo(); res = { did: 'ai', label: 'AI 호출' }; }
+    else if (S.screen === 'loop') {
+      const inst = ang < 45 || ang >= 315 ? 'kick' : ang >= 135 && ang < 225 ? 'hhc' : 'snare';
+      recordHit(inst); res = { did: 'drum', label: INST[inst].ko + (S.loop.rec ? ' · 루프에 기록' : '') };
+    } else if (S.playing || S.screen === 'chord') {
+      const k = detectedKey(), deg = DEG[Math.round(ang / 90) % 4], c = chordInfo(k, deg);
+      const g = ctx.createGain(); g.gain.value = 1; g.connect(AE.chordBus || AE.master);
+      playChord(c.notes.map(x => x + 60), ctx.currentTime + 0.01, 0.45, DB.settings.sound || 'piano', g, 0.2 * v);
+      res = { did: 'chord', label: c.sym + ' · ' + c.ko + ' (' + c.label + ')' };
+    }
+    S.discPulse = 1;
+    post({ type: 'mimo-touch-ack', ...res });
+  });
+})();
